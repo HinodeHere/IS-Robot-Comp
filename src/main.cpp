@@ -3,13 +3,19 @@
 #include "motor.h"
 
 void setup(){
+    Serial.begin(115200);
     //Initiate everything
-    sensorsInit();
-    motorInit();
+    // sensorsInit();
+    // motorInit();
+    delay(500);
+    Serial.println("Starting");
 }
 
 
 void loop(){
+    Serial.print("Printing Pos A: ");
+    Serial.println(posC);
+    delay(100);
     // for when if reach white line it will reverse back for 500ms
     // moveRobot(100,0,0);
     // while(readIRsensor() != 0){
@@ -41,7 +47,7 @@ void loop(){
     // }
     // while(1){}
 
-    moveRobot(0,50,0);
+    // moveRobot(0,50,0);
 
 
     // int rotation = 6;
