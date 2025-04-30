@@ -40,8 +40,8 @@ void motorInit(){
     //Motor B encoder
     pinMode(ENB1,INPUT_PULLUP);
     pinMode(ENB2,INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(ENB1),readPulseB1,CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ENB2),readPulseB2,CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENB1),readPulseB1,RISING);
+    attachInterrupt(digitalPinToInterrupt(ENB2),readPulseB2,RISING);
 
     //Motor C encoder
     pinMode(ENC1,INPUT_PULLUP);
@@ -69,25 +69,25 @@ void motorInit(){
 void readPulseA1(){
     int a = digitalRead(ENA1);
     int b = digitalRead(ENA2);
-    a == b ? posA-- : posA++;
+    a == b ? posA++ : posA--;
 }
 
 void readPulseA2(){
     int a = digitalRead(ENA1);
     int b = digitalRead(ENA2);
-    a != b ? posA-- : posA++;
+    a != b ? posA++ : posA--;
 }
 
 void readPulseB1(){
     int a = digitalRead(ENB1);
     int b = digitalRead(ENB2);
-    a == b ? posB-- : posB++;
+    a == b ? posB++ : posB--;
 }
 
 void readPulseB2(){
     int a = digitalRead(ENB1);
     int b = digitalRead(ENB2);
-    a != b ? posB-- : posB++;
+    a != b ? posB++ : posB--;
 }
 
 void readPulseC1(){
@@ -126,8 +126,8 @@ void moveRobot(int Vx,int Vy, int Rot){ //speed from -255 to 255
     int bl = constrain(Vx - Vy + Rot, -255, 255);
     int br = constrain(Vx + Vy - Rot, -255, 255);
 
-    setmotor(-fl > 0 ? 1 : 0,BIN1,BIN2,CH_B,abs(fl));  //theres a negative because the motor was upside-down
-    setmotor(-fr > 0 ? 1 : 0,AIN1,AIN2,CH_A,abs(fr));
+    setmotor(fl > 0 ? 1 : 0,BIN1,BIN2,CH_B,abs(fl));  //theres a negative because the motor was upside-down
+    setmotor(fr > 0 ? 1 : 0,AIN1,AIN2,CH_A,abs(fr));
     setmotor(bl > 0 ? 1 : 0,DIN1,DIN2,CH_D,abs(bl));
     setmotor(br > 0 ? 1 : 0,CIN1,CIN2,CH_C,abs(br));
 }
@@ -163,22 +163,27 @@ void updateOnePID(PIDMotor &pid,int targetRPM){
     pid.prevPos = currPos;
 
     //calculate the RPM at the current timestamp
-    pid.rpm = (deltaPos/pulsePerRotation) / deltaT * 60.0;
+    pid.rpm = ((float)deltaPos/pulsePerRotation) / deltaT * 60.0f;
 
     //calculate the error now!
     float e = targetRPM - pid.rpm;
 
-    //Update the values in eIntegral,de/dt and ePrev
+    //Update the values in e    Integral,de/dt and ePrev
     pid.eIntegral += e*deltaT;
     float dedt = (e-pid.ePrev)/deltaT;
     pid.ePrev = e;
 
     //Tune these constants
-    float Kp = 0.005;
-    float Ki = 0;
-    float Kd = 0;
+    float Kp = 0.6;
+    float Ki = 0.5;
+    float Kd = 0.02;
 
     pid.output = Kp * e + Ki * pid.eIntegral + Kd * dedt;
+
+    Serial.print("error: "); Serial.println(e);
+    Serial.print("deltaPos: "); Serial.print(deltaPos);
+    Serial.print(" | deltaT: "); Serial.print(deltaT,6);
+    Serial.print(" | rpm: ");    Serial.println(pid.rpm,2);
 }
 
 //Now if some exceed 255 or lower than -255, we need to scale all the motors by ratio!

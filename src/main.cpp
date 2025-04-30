@@ -6,16 +6,19 @@ void setup(){
     Serial.begin(115200);
     //Initiate everything
     // sensorsInit();
-    // motorInit();
+
+    motorInit();
     delay(500);
     Serial.println("Starting");
 }
 
 
 void loop(){
-    Serial.print("Printing Pos A: ");
-    Serial.println(posC);
-    delay(100);
+    // Serial.print("Printing Pos C: ");
+    // Serial.println(posC);
+    // delay(100);
+
+
     // for when if reach white line it will reverse back for 500ms
     // moveRobot(100,0,0);
     // while(readIRsensor() != 0){
@@ -54,5 +57,10 @@ void loop(){
     // PIDController(rotation);
     // Serial.println(pos);
     // delay(15);
+
+    PIDControl(60);
+    delay(200);
+
+    // Serial.println(posA);
 
 }

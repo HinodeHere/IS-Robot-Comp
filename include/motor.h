@@ -4,8 +4,8 @@
 
 // === Motor A ===
 #define PWMA 42
-#define AIN1 40
-#define AIN2 41
+#define AIN1 41
+#define AIN2 40
 // Encoder pins:
 #define EN1A 21
 #define EN1B 48
@@ -14,9 +14,9 @@
 #define ENA2 EN1B
 
 // === Motor B ===
-#define PWMB 7
-#define BIN1 5
-#define BIN2 6
+#define PWMB 2
+#define BIN1 37
+#define BIN2 36
 // Encoder pins:
 #define EN2A 35
 #define EN2B 45
@@ -24,19 +24,19 @@
 #define ENB2 EN2B
 
 // === Motor C ===
-#define PWMC 2
-#define CIN1 37 
-#define CIN2 36
+#define PWMC 13
+#define CIN1 11
+#define CIN2 12
 // Encoder pins:
 #define EN3A 9
-#define EN3B 3 //NEED TO CHANGE
+#define EN3B 8
 #define ENC1 EN3A
 #define ENC2 EN3B
 
 // === Motor D ===
-#define PWMD 13
-#define DIN1 11
-#define DIN2 12
+#define PWMD 7
+#define DIN1 6 
+#define DIN2 5
 // Encoder pins:
 #define EN4A 10
 #define EN4B 46
