@@ -13,6 +13,7 @@
 volatile uint8_t pendingType = 0;
 volatile uint8_t distance = 0;
 volatile bool newCommand = false;
+bool motorsRunning = false;
 
 //@brief data (type, distance);
 //@param type {0 = stop motors,1 = forward, 2 = back, 3 = left, 4 = right}
@@ -42,9 +43,9 @@ void receivedEvent(int bytes){
 
 //only used when i need to send data back to Master!
 void requestedEvent(){
-  String reply = "Pong";
-  Wire.write(reply.c_str());
-  Serial.println("Replied: Pong!");
+    //sends 0 if done, 1 if running
+  uint8_t status = motorsRunning ? 1 : 0;
+  Wire.write(&status,1);
 }
 
 // For when the ESP is a SLAVE!!
@@ -56,7 +57,7 @@ void setup(){
     Wire.onReceive(receivedEvent);
 
     // only used when i need to send data back to Master
-    //   Wire.onRequest(requestedEvent);
+    Wire.onRequest(requestedEvent);
 }
 
 void loop(){
@@ -66,24 +67,31 @@ void loop(){
         switch (pendingType) {
             case 0:
               stopAllMotor();
+              motorsRunning = false;
               break;
       
             case 1:
+              motorsRunning = true;
               moveByDistanceDecel(DIR_FORWARD,  distance, maxSpeed);
               break;
       
             case 2:
+              motorsRunning = true;
               moveByDistanceDecel(DIR_BACKWARD, distance, maxSpeed);
               break;
       
             case 3:
+              motorsRunning = true;
               moveByDistanceDecel(DIR_LEFT,     distance, maxSpeed);
               break;
       
             case 4:
+              motorsRunning = true;
               moveByDistanceDecel(DIR_RIGHT,    distance, maxSpeed);
               break;
         }
+
+        motorsRunning = false;
     }
 }
 
