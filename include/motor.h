@@ -62,8 +62,6 @@ extern volatile int64_t posB;
 extern volatile int64_t posC;
 extern volatile int64_t posD;
 
-extern volatile bool motorsRunning;
-
 struct PIDMotor{
     volatile int64_t* pos;
     

@@ -290,8 +290,6 @@ void rotationPIDController(int rotation){
 
 
 // Cardinal movement directions
-enum Direction { DIR_FORWARD, DIR_BACKWARD, DIR_LEFT, DIR_RIGHT };
-
 // Wheel geometry (set your actual radius here)
 const float wheelRadiusCm = 5.0f;  // wheel radius in centimeters
 
