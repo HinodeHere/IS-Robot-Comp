@@ -126,10 +126,10 @@ void moveRobot(int Vx,int Vy, int Rot){ //speed from -255 to 255
     int bl = constrain(Vx - Vy + Rot, -255, 255);
     int br = constrain(Vx + Vy - Rot, -255, 255);
 
-    setmotor(fl > 0 ? 1 : 0,BIN1,BIN2,CH_B,abs(fl));  //theres a negative because the motor was upside-down
-    setmotor(fr > 0 ? 1 : 0,AIN1,AIN2,CH_A,abs(fr));
-    setmotor(bl > 0 ? 1 : 0,DIN1,DIN2,CH_D,abs(bl));
-    setmotor(br > 0 ? 1 : 0,CIN1,CIN2,CH_C,abs(br));
+    setmotor(fl > 0 ? 1 : 0,CIN1,CIN2,CH_C,abs(fl));  //theres a negative because the motor was upside-down
+    setmotor(fr > 0 ? 1 : 0,BIN1,BIN2,CH_B,abs(fr));
+    setmotor(-bl > 0 ? 1 : 0,DIN1,DIN2,CH_D,abs(bl));
+    setmotor(-br > 0 ? 1 : 0,AIN1,AIN2,CH_A,abs(br));
 }
 
 void stopAllMotor(){
@@ -285,4 +285,67 @@ void rotationPIDController(int rotation){
     Serial.print(u);
     Serial.print(" ");
     Serial.println(pos);
+}
+
+
+
+// Cardinal movement directions
+enum Direction { DIR_FORWARD, DIR_BACKWARD, DIR_LEFT, DIR_RIGHT };
+
+// Wheel geometry (set your actual radius here)
+const float wheelRadiusCm = 5.0f;  // wheel radius in centimeters
+
+/**
+ * @brief Moves the robot a specified linear distance in cm with a deceleration ramp.
+ *
+ * Strafing (left/right) requires each wheel to rotate farther by √2 due to 45° motion vectors.
+ *
+ * @param dir        Movement direction (DIR_FORWARD, DIR_BACKWARD, DIR_LEFT, DIR_RIGHT)
+ * @param distanceCm Linear distance to travel in centimeters
+ * @param maxSpeed   Maximum motor speed (0–255)
+ */
+void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed) {
+    // Calculate required rotations
+    float baseRotations = distanceCm / (2.0f * PI * wheelRadiusCm);
+    // Strafing factor: wheels must cover diagonal component
+    float factor = (dir == DIR_LEFT || dir == DIR_RIGHT) ? sqrt(2.0f) : 1.0f;
+    float rotations = baseRotations * factor;
+
+    // Convert to encoder pulses
+    int64_t target = (int64_t)(rotations * pulsePerRotation);
+    int64_t ramp   = pulsePerRotation / 4;      // decelerate over last quarter-turn
+    const int creep = 30;                      // minimal crawl speed
+
+    // Snapshot starting counts
+    int64_t startA = posA, startB = posB, startC = posC, startD = posD;
+
+    while (true) {
+        // Calculate each wheel's progress
+        int64_t dA = llabs(posA - startA);
+        int64_t dB = llabs(posB - startB);
+        int64_t dC = llabs(posC - startC);
+        int64_t dD = llabs(posD - startD);
+        // Use the minimum progress to avoid one wheel stalling
+        int64_t minDelta = min(min(dA, dB), min(dC, dD));
+
+        if (minDelta >= target) break;
+
+        // Dynamic speed ramp-down
+        int s = maxSpeed;
+        int64_t toGo = target - minDelta;
+        if (toGo < ramp) {
+            s = constrain((int)((float)toGo / ramp * (maxSpeed - creep) + creep),
+                          creep, maxSpeed);
+        }
+
+        // Drive at speed 's'
+        switch (dir) {
+            case DIR_FORWARD:  moveRobot( 0,  s, 0); break;
+            case DIR_BACKWARD: moveRobot( 0, -s, 0); break;
+            case DIR_LEFT:     moveRobot(-s,  0, 0); break;
+            case DIR_RIGHT:    moveRobot( s,  0, 0); break;
+            }
+            delayMicroseconds(100);
+        }
+        stopAllMotor();
 }

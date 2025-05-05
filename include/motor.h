@@ -28,8 +28,8 @@
 #define CIN1 11
 #define CIN2 12
 // Encoder pins:
-#define EN3A 9
-#define EN3B 8
+#define EN3A 8
+#define EN3B 9
 #define ENC1 EN3A
 #define ENC2 EN3B
 
@@ -78,6 +78,12 @@ extern PIDMotor pidB;
 extern PIDMotor pidC;
 extern PIDMotor pidD;
 
+enum Direction {
+    DIR_FORWARD,
+    DIR_BACKWARD,
+    DIR_LEFT,
+    DIR_RIGHT
+  };
 
 //for motor A's encoder
 void readPulseA1();
@@ -118,6 +124,8 @@ void applyPIDoutputs();
 void PIDControl(int targetRPM);
 
 void rotationPIDController(int rotation);
+
+void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed);
 
 
 #endif
