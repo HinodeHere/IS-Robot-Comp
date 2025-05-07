@@ -8,7 +8,7 @@
 #define SDA 38
 #define freq 100000
 
-#define maxSpeed 200
+#define maxSpeed 50 //in pwm
 
 volatile uint8_t pendingType = 0;
 volatile uint8_t distance = 0;
@@ -50,81 +50,97 @@ void requestedEvent(){
 
 // For when the ESP is a SLAVE!!
 
-void setup(){
-    Serial.begin(115200);
-    motorInit();
-    Wire.begin(SLAVE_ADDR,SDA,SCL,freq);
-    Wire.onReceive(receivedEvent);
+// void setup(){
+//     Serial.begin(115200);
+//     motorInit();
+//     Wire.begin(SLAVE_ADDR,SDA,SCL,freq);
+//     Wire.onReceive(receivedEvent);
 
-    // only used when i need to send data back to Master
-    Wire.onRequest(requestedEvent);
-}
+//     // only used when i need to send data back to Master
+//     Wire.onRequest(requestedEvent);
+// }
 
-void loop(){
-    if (newCommand == true){
-        newCommand = false;
+// void loop(){
+//     if (newCommand == true){
+//         newCommand = false;
 
-        switch (pendingType) {
-            case 0:
-              stopAllMotor();
-              motorsRunning = false;
-              break;
+//         switch (pendingType) {
+//             case 0:
+//               stopAllMotor();
+//               motorsRunning = false;
+//               break;
       
-            case 1:
-              motorsRunning = true;
-              moveByDistanceDecel(DIR_FORWARD,  distance, maxSpeed);
-              break;
+//             case 1:
+//               motorsRunning = true;
+//               moveByDistanceDecel(DIR_FORWARD,  distance, maxSpeed);
+//               break;
       
-            case 2:
-              motorsRunning = true;
-              moveByDistanceDecel(DIR_BACKWARD, distance, maxSpeed);
-              break;
+//             case 2:
+//               motorsRunning = true;
+//               moveByDistanceDecel(DIR_BACKWARD, distance, maxSpeed);
+//               break;
       
-            case 3:
-              motorsRunning = true;
-              moveByDistanceDecel(DIR_LEFT,     distance, maxSpeed);
-              break;
+//             case 3:
+//               motorsRunning = true;
+//               moveByDistanceDecel(DIR_LEFT,     distance, maxSpeed);
+//               break;
       
-            case 4:
-              motorsRunning = true;
-              moveByDistanceDecel(DIR_RIGHT,    distance, maxSpeed);
-              break;
-        }
+//             case 4:
+//               motorsRunning = true;
+//               moveByDistanceDecel(DIR_RIGHT,    distance, maxSpeed);
+//               break;
+//         }
 
-        motorsRunning = false;
-    }
-}
+//         motorsRunning = false;
+//     }
+// }
 
 
 
 //ONLY FOR WHEN THE ESP32 IS NOT A SLAVE!
 
-// void setup(){
-//     motorInit();
+void setup(){
+    motorInit();
 
-//   Serial.begin(115200);
-// }
+  Serial.begin(115200);
+}
 
-// void loop(){
+void loop(){
+  for (int i = 0; i < 3; i++){
+    moveByDistanceDecel(DIR_FORWARD,70.0f,maxSpeed);
+    delay(500);
+  }
+  for (int i = 0; i < 3; i++){
+    moveByDistanceDecel(DIR_BACKWARD,70.0f,maxSpeed);
+    delay(500);
+  }
+
+  // for (int i = 0; i < 15; i++){
+  //   PIDControl(60);
+  //   delay(250);
+  // }
+
+  stopAllMotor();
+  while(1){}
     // moveRobot(100,0,0);
 
     // Serial.print("Printing Pos A: ");
     // Serial.print(posA);
-    // delay(100);
+    // delay(10);
 
     // Serial.print(" Printing Pos B: ");
     // Serial.print(posB);
-    // delay(100);
+    // delay(10);
 
     // Serial.print(" Printing Pos C: ");
     // Serial.print(posC);
-    // delay(100);
+    // delay(10);
 
     // Serial.print(" Printing Pos D: ");
     // Serial.println(posD);
-    // delay(100);
+    // delay(10);
 
-    // for when if reach white line it will reverse back for 500ms
+    // // for when if reach white line it will reverse back for 500ms
     // moveRobot(100,0,0);
     // while(readIRsensor() != 0){
     //     Serial.println(readIRsensor());
@@ -136,7 +152,7 @@ void loop(){
     // while(1){}
     
 
-    // move robot in a square
+    // // move robot in a square
     // for (int i = 0; i < 4; i++){
     //     moveRobot(100,0,0);
     //     delay(500);
@@ -153,8 +169,6 @@ void loop(){
     //     stopAllMotor();
     //     delay(500);
     // }
-    // while(1){}
-
     // moveRobot(0,50,0);
 
 
@@ -167,4 +181,5 @@ void loop(){
 
     // Serial.println(posA);
 
-// }
+    // while(1){}
+}

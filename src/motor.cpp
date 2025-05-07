@@ -93,13 +93,13 @@ void readPulseB2(){
 void readPulseC1(){
     int a = digitalRead(ENC1);
     int b = digitalRead(ENC2);
-    a == b ? posC-- : posC++;
+    a == b ? posC++ : posC--;
 }
 
 void readPulseC2(){
     int a = digitalRead(ENC1);
     int b = digitalRead(ENC2);
-    a != b ? posC-- : posC++;
+    a != b ? posC++ : posC--;
 }
 
 void readPulseD1(){
@@ -174,9 +174,9 @@ void updateOnePID(PIDMotor &pid,int targetRPM){
     pid.ePrev = e;
 
     //Tune these constants
-    float Kp = 0.6;
+    float Kp = 0.8;
     float Ki = 0.5;
-    float Kd = 0.02;
+    float Kd = 0.005;
 
     pid.output = Kp * e + Ki * pid.eIntegral + Kd * dedt;
 
@@ -205,10 +205,11 @@ void scaleAllPID(){
 
 //Apply all the PID Output to all the motors
 void applyPIDoutputs(){
-    setmotor(pidA.output>=0 , AIN1, AIN2, CH_A, (int)abs(pidA.output));
-    setmotor(pidB.output>=0 , BIN1, BIN2, CH_B, (int)abs(pidB.output));
+    float factor = 1.13f;
+    setmotor(pidA.output<=0 , AIN1, AIN2, CH_A, (int)abs(pidA.output)*factor);
+    setmotor(pidB.output>=0 , BIN1, BIN2, CH_B, (int)abs(pidB.output)*factor);
     setmotor(pidC.output>=0 , CIN1, CIN2, CH_C, (int)abs(pidC.output));
-    setmotor(pidD.output>=0 , DIN1, DIN2, CH_D, (int)abs(pidD.output));    
+    setmotor(pidD.output<=0 , DIN1, DIN2, CH_D, (int)abs(pidD.output));    
 }
 
 
@@ -288,62 +289,82 @@ void rotationPIDController(int rotation){
 }
 
 
+const float wheelRadiusCm = 5.0f;   // wheel radius in cm
+const int   creep         = 30;    // minimum PWM to overcome static friction
 
-// Cardinal movement directions
-// Wheel geometry (set your actual radius here)
-const float wheelRadiusCm = 5.0f;  // wheel radius in centimeters
+// Position-PID gains (tune these)
+const float Kp_pos = 0.8f;
+const float Ki_pos = 0.01f;
+const float Kd_pos = 0.08f;
 
-/**
- * @brief Moves the robot a specified linear distance in cm with a deceleration ramp.
- *
- * Strafing (left/right) requires each wheel to rotate farther by √2 due to 45° motion vectors.
- *
- * @param dir        Movement direction (DIR_FORWARD, DIR_BACKWARD, DIR_LEFT, DIR_RIGHT)
- * @param distanceCm Linear distance to travel in centimeters
- * @param maxSpeed   Maximum motor speed (0–255)
- */
-void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed) {
-    // Calculate required rotations
-    float baseRotations = distanceCm / (2.0f * PI * wheelRadiusCm);
-    // Strafing factor: wheels must cover diagonal component
-    float factor = (dir == DIR_LEFT || dir == DIR_RIGHT) ? sqrt(2.0f) : 1.0f;
-    float rotations = baseRotations * factor;
+// Heading-PID gains (tune these)(rotation)
+const float Kp_h = 0.313f;
+const float Ki_h = 0.05f;
+const float Kd_h = 0.01f;
 
-    // Convert to encoder pulses
-    int64_t target = (int64_t)(rotations * pulsePerRotation);
-    int64_t ramp   = pulsePerRotation / 4;      // decelerate over last quarter-turn
-    const int creep = 30;                      // minimal crawl speed
+void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
+    distanceCm -= 2;
+    float rotation = distanceCm / (2.0f * PI * wheelRadiusCm);
+    if(dir == DIR_LEFT || dir == DIR_RIGHT) rotation *= sqrt(2.0f);
+    int64_t target = (int64_t)(rotation * pulsePerRotation);
+    if(target < 0) return;
 
-    // Snapshot starting counts
-    int64_t startA = posA, startB = posB, startC = posC, startD = posD;
+    int64_t sA = posA, sB = posB, sC = posC, sD = posD;
 
-    while (true) {
-        // Calculate each wheel's progress
-        int64_t dA = llabs(posA - startA);
-        int64_t dB = llabs(posB - startB);
-        int64_t dC = llabs(posC - startC);
-        int64_t dD = llabs(posD - startD);
-        // Use the minimum progress to avoid one wheel stalling
-        int64_t minDelta = min(min(dA, dB), min(dC, dD));
+    float prevErrPos = float(target);
+    float intErrPos    = 0.0f;
+    float prevErrHead  = 0.0f;
+    float intErrHead   = 0.0f;
+    uint32_t prevTime  = micros();
+    bool firstLoop     = true;
 
-        if (minDelta >= target) break;
+    while(true){
+        //measure progress
+        int64_t dA = llabs(posA - sA);
+        int64_t dB = llabs(posB - sB);
+        int64_t dC = llabs(posC - sC);
+        int64_t dD = llabs(posD - sD);
+        int64_t travelled = min(min(dA,dB), min(dC,dD));
+        if (travelled >= target) break;
 
-        // Dynamic speed ramp-down
-        int s = maxSpeed;
-        int64_t toGo = target - minDelta;
-        if (toGo < ramp) {
-            s = constrain((int)((float)toGo / ramp * (maxSpeed - creep) + creep),
-                          creep, maxSpeed);
+        //calculate dt
+        uint32_t now = micros();
+        float dt = (now - prevTime) * 1e-6f;
+        prevTime = now;
+        if (firstLoop || dt < 1e-4f) {
+            dt = 0.0f;
+            firstLoop = false;
         }
 
-        // Drive at speed 's'
+        //position PID
+        float errPos = float(target - travelled);
+        intErrPos   += errPos * dt;
+        float dErrPos = dt>0 ? (errPos - prevErrPos)/dt : 0.0f;
+        prevErrPos = errPos;
+        float uPos   = Kp_pos * errPos + Ki_pos * intErrPos + Kd_pos * dErrPos;
+        int s        = constrain((int)uPos, creep, maxSpeed);
+
+        //heading PID (yaw)
+        float leftDist  = float(dC + dD) * 0.5f;
+        float rightDist = float(dA + dB) * 0.5f;
+        float errHead   = rightDist - leftDist;
+        intErrHead     += errHead * dt;
+        float dErrHead  = dt>0 ? (errHead - prevErrHead)/dt : 0.0f;
+        prevErrHead    = errHead;
+        float uHead     = Kp_h * errHead + Ki_h * intErrHead + Kd_h * dErrHead;
+        int rotVel     = constrain((int)uHead, -maxSpeed, maxSpeed);
+
+        //drive it now
+        int vx=0, vy=0;
         switch (dir) {
-            case DIR_FORWARD:  moveRobot( 0,  s, 0); break;
-            case DIR_BACKWARD: moveRobot( 0, -s, 0); break;
-            case DIR_LEFT:     moveRobot(-s,  0, 0); break;
-            case DIR_RIGHT:    moveRobot( s,  0, 0); break;
-            }
-            delayMicroseconds(100);
+            case DIR_FORWARD:  vx =  s; vy = 0; break;
+            case DIR_BACKWARD: vx = -s; vy = 0; rotVel = -rotVel; break;
+            case DIR_LEFT:     vx =  0; vy = -s; break;
+            case DIR_RIGHT:    vx =  0; vy =  s; break;
         }
-        stopAllMotor();
+        moveRobot(vx, vy, rotVel);
+        delayMicroseconds(100);
+    }
+    stopAllMotor();
+
 }
