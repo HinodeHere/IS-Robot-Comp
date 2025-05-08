@@ -85,6 +85,11 @@ enum Direction {
     DIR_RIGHT
   };
 
+
+//IR Sensors
+#define IR_LEFT -1
+#define IR_RIGHT -1//put numbers here!
+
 //for motor A's encoder
 void readPulseA1();
 void readPulseA2();

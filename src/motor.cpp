@@ -59,6 +59,9 @@ void motorInit(){
 
     digitalWrite(STANDBY,1); //make all motors to be in Stanby Mode (i.e. it can move now)
 
+    //IR Sensors:
+    
+
     //Make all the prevPos to be the current pos when the motor is started
     pidA.prevPos = *(pidA.pos);
     pidB.prevPos = *(pidB.pos);
@@ -302,6 +305,8 @@ const float Kp_h = 0.313f;
 const float Ki_h = 0.05f;
 const float Kd_h = 0.01f;
 
+int ALIGN_SPEED = 40; //for correcting yaw of robot when it crosses a while line
+
 void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
     distanceCm -= 2;
     float rotation = distanceCm / (2.0f * PI * wheelRadiusCm);
@@ -353,6 +358,19 @@ void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
         prevErrHead    = errHead;
         float uHead     = Kp_h * errHead + Ki_h * intErrHead + Kd_h * dErrHead;
         int rotVel     = constrain((int)uHead, -maxSpeed, maxSpeed);
+
+
+        //line sensor overwrite yaw PID on white line
+        bool leftLine = (digitalRead(IR_LEFT) == LOW);
+        bool rightLine = (digitalRead(IR_RIGHT) == LOW);
+        if (leftLine || rightLine){
+            if (leftLine && !rightLine) rotVel = -ALIGN_SPEED; //turn right
+            else if (rightLine && !leftLine) rotVel = ALIGN_SPEED;
+            else rotVel = 0;
+
+            prevErrHead = 0;
+            intErrHead = 0;
+        }
 
         //drive it now
         int vx=0, vy=0;
