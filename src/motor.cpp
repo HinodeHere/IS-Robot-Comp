@@ -302,14 +302,28 @@ const float Kp_pos = 0.8f;
 const float Ki_pos = 0.01f;
 const float Kd_pos = 0.08f;
 
-// Heading-PID gains (tune these)(rotation)
-const float Kp_h = 0.10f;
-const float Ki_h = 0.001f;
+// Heading-PID gains (tune these)(rotation) //left and right
+const float Kp_h = 0.75f;
+const float Ki_h = 0.01;
 const float Kd_h = 0.01f;
 
 int ALIGN_SPEED = 40; //for correcting yaw of robot when it crosses a while line
 
 void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
+    if (dir == DIR_LEFT || dir == DIR_RIGHT){
+        maxSpeed = 50;
+    }
+    double ratioForwards = 140.0f/147.5f;
+    double ratioBackwards = 140.0f/145.0f;
+    double ratioLeft = 140.0f/147.5f;
+    double ratioRight = 140.0f/147.6f;
+    switch(dir){
+        case DIR_FORWARD: distanceCm*=ratioForwards; break;
+        case DIR_BACKWARD: distanceCm*=ratioBackwards; break;
+        case DIR_LEFT: distanceCm*=ratioLeft; break;
+        case DIR_RIGHT: distanceCm*=ratioRight; break;
+    }
+
     float rotation = distanceCm / (2.0f * PI * wheelRadiusCm);
     int64_t target = (int64_t)(rotation * pulsePerRotation);
     if(target < 0) return;
@@ -325,6 +339,10 @@ void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
 
     int64_t rampUpDist = target * 0.15;
     int64_t rampDownDist = target * 0.15; //ramp up/down
+
+    if (dir == DIR_LEFT || dir == DIR_RIGHT){
+        rampUpDist = 0;
+    }
 
     while(true){
         //measure progress
