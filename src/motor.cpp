@@ -30,7 +30,6 @@ void motorInit(){
     pinMode(DIN1,OUTPUT);
     pinMode(DIN2,OUTPUT);
 
-
     //Motor A encoder
     pinMode(ENA1,INPUT_PULLUP);
     pinMode(ENA2,INPUT_PULLUP);
@@ -60,6 +59,9 @@ void motorInit(){
     digitalWrite(STANDBY,1); //make all motors to be in Stanby Mode (i.e. it can move now)
 
     //IR Sensors:
+    pinMode(IR_LEFT,INPUT);
+    pinMode(IR_RIGHT,INPUT);
+
     
 
     //Make all the prevPos to be the current pos when the motor is started
@@ -301,16 +303,14 @@ const float Ki_pos = 0.01f;
 const float Kd_pos = 0.08f;
 
 // Heading-PID gains (tune these)(rotation)
-const float Kp_h = 0.313f;
-const float Ki_h = 0.05f;
+const float Kp_h = 0.10f;
+const float Ki_h = 0.001f;
 const float Kd_h = 0.01f;
 
 int ALIGN_SPEED = 40; //for correcting yaw of robot when it crosses a while line
 
 void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
-    distanceCm -= 2;
     float rotation = distanceCm / (2.0f * PI * wheelRadiusCm);
-    if(dir == DIR_LEFT || dir == DIR_RIGHT) rotation *= sqrt(2.0f);
     int64_t target = (int64_t)(rotation * pulsePerRotation);
     if(target < 0) return;
 
@@ -322,6 +322,9 @@ void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
     float intErrHead   = 0.0f;
     uint32_t prevTime  = micros();
     bool firstLoop     = true;
+
+    int64_t rampUpDist = target * 0.15;
+    int64_t rampDownDist = target * 0.15; //ramp up/down
 
     while(true){
         //measure progress
@@ -349,30 +352,42 @@ void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
         float uPos   = Kp_pos * errPos + Ki_pos * intErrPos + Kd_pos * dErrPos;
         int s        = constrain((int)uPos, creep, maxSpeed);
 
+
+        //RampUp / RampDown
+        float rampUp   = constrain((float)travelled    / rampUpDist, 0, 1);
+        float rampDown = constrain((float)(target - travelled) / rampDownDist, 0, 1);
+        float rampMul  = min(rampUp, rampDown);
+        rampMul = max(rampMul, 0.20f); //ensure atleast got power to move
+
+        s *= rampMul;
+        if (s > 0 && s < creep){
+            s = creep;
+        }
+        
         //heading PID (yaw)
-        float leftDist  = float(dC + dD) * 0.5f;
-        float rightDist = float(dA + dB) * 0.5f;
-        float errHead   = rightDist - leftDist;
+        float leftAvg;
+        float rightAvg;
+        if (dir == DIR_BACKWARD || dir ==DIR_FORWARD){
+            leftAvg  = ( llabs(posC - sC) + llabs(posD - sD) ) * 0.5f;
+            rightAvg = ( llabs(posA - sA) + llabs(posB - sB) ) * 0.5f;
+        } else if (dir == DIR_LEFT){
+            leftAvg  = ( llabs(posA - sA) + llabs(posD - sD) ) * 0.5f;
+            rightAvg = ( llabs(posC - sC) + llabs(posB - sB) ) * 0.5f; 
+        } else{
+            rightAvg  = ( llabs(posA - sA) + llabs(posD - sD) ) * 0.5f;
+            leftAvg = ( llabs(posC - sC) + llabs(posB - sB) ) * 0.5f; 
+
+        }
+        float errHead   = rightAvg - leftAvg;
         intErrHead     += errHead * dt;
         float dErrHead  = dt>0 ? (errHead - prevErrHead)/dt : 0.0f;
         prevErrHead    = errHead;
         float uHead     = Kp_h * errHead + Ki_h * intErrHead + Kd_h * dErrHead;
         int rotVel     = constrain((int)uHead, -maxSpeed, maxSpeed);
+        Serial.print("errYaw="); Serial.println(intErrHead);
 
 
-        //line sensor overwrite yaw PID on white line
-        bool leftLine = (digitalRead(IR_LEFT) == LOW);
-        bool rightLine = (digitalRead(IR_RIGHT) == LOW);
-        if (leftLine || rightLine){
-            if (leftLine && !rightLine) rotVel = -ALIGN_SPEED; //turn right
-            else if (rightLine && !leftLine) rotVel = ALIGN_SPEED;
-            else rotVel = 0;
-
-            prevErrHead = 0;
-            intErrHead = 0;
-        }
-
-        //drive it now
+        //change vx,vy and rotvel by PID!
         int vx=0, vy=0;
         switch (dir) {
             case DIR_FORWARD:  vx =  s; vy = 0; break;
@@ -380,8 +395,29 @@ void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
             case DIR_LEFT:     vx =  0; vy = -s; break;
             case DIR_RIGHT:    vx =  0; vy =  s; break;
         }
+
+        // //line sensor overwrite yaw PID on white line
+        // bool leftLine = (digitalRead(IR_LEFT) == LOW);
+        // bool rightLine = (digitalRead(IR_RIGHT) == LOW);
+        // if ((leftLine || rightLine) && (dir == DIR_BACKWARD || dir == DIR_FORWARD)){
+        //     //halt x and y direction movement
+        //     vx*=0.3;
+        //     vy*=0.3;
+        //     if (leftLine && !rightLine) rotVel = -ALIGN_SPEED; //turn right
+        //     else if (rightLine && !leftLine) rotVel = ALIGN_SPEED;
+        //     else rotVel = 0;
+
+        //     prevErrHead = 0;
+        //     intErrHead = 0;
+        //     if (dir == DIR_BACKWARD) rotVel = -rotVel;
+        // }
+
         moveRobot(vx, vy, rotVel);
-        delayMicroseconds(100);
+        // Serial.print("vx="); Serial.println(vx);
+        // Serial.print(" vy="); Serial.println(vy);
+        // Serial.print(" rot="); Serial.println(rotVel);
+
+        delay(2);
     }
     stopAllMotor();
 
