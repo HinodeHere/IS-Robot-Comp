@@ -126,6 +126,7 @@ void setmotor(int dir, int in1, int in2, int pwmChannel, int speed){ //1 for cw 
 }
 
 void moveRobot(int Vx,int Vy, int Rot){ //speed from -255 to 255
+    Vy *= -1;
     int fl = constrain(Vx + Vy + Rot, -255, 255);
     int fr = constrain(Vx - Vy - Rot, -255, 255);
     int bl = constrain(Vx - Vy + Rot, -255, 255);
@@ -151,9 +152,8 @@ PIDMotor pidC = {&posC,0.0f,0.0f,0L,0.0f,0.0f,0};
 PIDMotor pidD = {&posD,0.0f,0.0f,0L,0.0f,0.0f,0};
 
 //update the output FOR ONE MOTOR needed to reach the target RPM!
-void updateOnePID(PIDMotor &pid,int targetRPM,Direction dir){
+void updateOnePID(PIDMotor &pid,int targetRPM,Direction dir, long currT){
     //Calculate deltaT and save currT to prevT
-    long currT = micros();
     if (pid.prevT == 0){
         pid.prevT   = currT;
         pid.prevPos = *(pid.pos);
@@ -163,7 +163,9 @@ void updateOnePID(PIDMotor &pid,int targetRPM,Direction dir){
     pid.prevT = currT;
 
     //calculate pos moved in deltaT time
+    noInterrupts();
     int64_t currPos = *(pid.pos);
+    interrupts();
     int64_t deltaPos = currPos - pid.prevPos;
     pid.prevPos = currPos;
 
@@ -183,7 +185,7 @@ void updateOnePID(PIDMotor &pid,int targetRPM,Direction dir){
     float Ki;
     float Kd;
     if (dir == DIR_LEFT){
-        Kp = 0.8;
+        Kp = 1.5;
         Ki = 0.5;
         Kd = 0.01;
     } else if (dir == DIR_RIGHT){
@@ -223,10 +225,9 @@ void scaleAllPID(){
 
 //Apply all the PID Output to all the motors
 void applyPIDoutputs(){
-    float factor = 1.13f;
     setmotor(pidA.output<=0 , AIN1, AIN2, CH_A, (int)abs(pidA.output));
-    setmotor(pidB.output>=0 , BIN1, BIN2, CH_B, (int)abs(pidB.output)*factor);
-    setmotor(pidC.output>=0 , CIN1, CIN2, CH_C, (int)abs(pidC.output)*factor);
+    setmotor(pidB.output>=0 , BIN1, BIN2, CH_B, (int)abs(pidB.output));
+    setmotor(pidC.output>=0 , CIN1, CIN2, CH_C, (int)abs(pidC.output));
     setmotor(pidD.output<=0 , DIN1, DIN2, CH_D, (int)abs(pidD.output));    
 }
 
@@ -251,33 +252,36 @@ void resetPIDError(){
 void PIDControl(Direction dir,int targetRPM){
     int compLeft = targetRPM / 12;
     int compRight = targetRPM / 11.8;
+    long currT = micros();
+
+    float factorA = 0.755f;
     switch(dir){
         case DIR_FORWARD:
-            updateOnePID(pidC,  targetRPM,dir);
-            updateOnePID(pidB,  targetRPM,dir);
-            updateOnePID(pidD,  targetRPM,dir);
-            updateOnePID(pidA,  targetRPM,dir);
+            updateOnePID(pidC,  targetRPM,dir,currT);
+            updateOnePID(pidB,  targetRPM,dir,currT);
+            updateOnePID(pidD,  targetRPM,dir,currT);
+            updateOnePID(pidA,  targetRPM*factorA,dir,currT);
             break;
 
         case DIR_BACKWARD:
-            updateOnePID(pidC,  -targetRPM,dir);
-            updateOnePID(pidB,  -targetRPM,dir);
-            updateOnePID(pidD,  -targetRPM,dir);
-            updateOnePID(pidA,  -targetRPM,dir);
-            break;
-
-        case DIR_LEFT:
-            updateOnePID(pidC,  -targetRPM - compLeft,dir);
-            updateOnePID(pidB,  targetRPM,dir);
-            updateOnePID(pidD,  targetRPM ,dir);
-            updateOnePID(pidA,  -targetRPM,dir);
+            updateOnePID(pidC,  -targetRPM,dir,currT);
+            updateOnePID(pidB,  -targetRPM,dir,currT);
+            updateOnePID(pidD,  -targetRPM,dir,currT);
+            updateOnePID(pidA,  (-targetRPM)*factorA,dir,currT);
             break;
 
         case DIR_RIGHT:
-            updateOnePID(pidC,  targetRPM + compRight,dir);
-            updateOnePID(pidB,  -targetRPM,dir);
-            updateOnePID(pidD,  -targetRPM,dir);
-            updateOnePID(pidA,  targetRPM,dir);
+            updateOnePID(pidC,  -targetRPM - compLeft,dir,currT);
+            updateOnePID(pidB,  targetRPM,dir,currT);
+            updateOnePID(pidD,  targetRPM ,dir,currT);
+            updateOnePID(pidA,  (-targetRPM)*factorA,dir,currT);
+            break;
+
+        case DIR_LEFT:
+            updateOnePID(pidC,  targetRPM,dir,currT);
+            updateOnePID(pidB,  -targetRPM,dir,currT);         
+            updateOnePID(pidD,  -targetRPM,dir,currT);
+            updateOnePID(pidA,  targetRPM*factorA,dir,currT);
             break;
 
     }
@@ -362,7 +366,7 @@ const float Ki_pos = 0.01f;
 const float Kd_pos = 0.1f;
 
 // Heading-PID gains (tune these)(rotation) //left and right
-const float Kp_h = 0.75f;
+const float Kp_h = 0.65f;
 const float Ki_h = 0.01;
 const float Kd_h = 0.01f;
 
