@@ -7,8 +7,8 @@
 #define AIN1 41
 #define AIN2 40
 // Encoder pins:
-#define EN1A 48
-#define EN1B 21
+#define EN1A 21
+#define EN1B 48
 //translate it to more readable format
 #define ENA1 EN1A
 #define ENA2 EN1B
