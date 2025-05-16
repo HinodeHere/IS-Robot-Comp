@@ -7,19 +7,19 @@
 #define AIN1 41
 #define AIN2 40
 // Encoder pins:
-#define EN1A 21
-#define EN1B 48
+#define EN1A 48
+#define EN1B 21
 //translate it to more readable format
 #define ENA1 EN1A
 #define ENA2 EN1B
 
 // === Motor B ===
 #define PWMB 2
-#define BIN1 37
-#define BIN2 36
+#define BIN1 36
+#define BIN2 37
 // Encoder pins:
-#define EN2A 35
-#define EN2B 45
+#define EN2A 45
+#define EN2B 35
 #define ENB1 EN2A
 #define ENB2 EN2B
 
@@ -28,18 +28,18 @@
 #define CIN1 11
 #define CIN2 12
 // Encoder pins:
-#define EN3A 8
-#define EN3B 9
+#define EN3A 17
+#define EN3B 18
 #define ENC1 EN3A
 #define ENC2 EN3B
 
 // === Motor D ===
 #define PWMD 7
-#define DIN1 6 
-#define DIN2 5
+#define DIN1 5
+#define DIN2 6
 // Encoder pins:
-#define EN4A 10
-#define EN4B 46
+#define EN4A 46
+#define EN4B 10
 #define END1 EN4A
 #define END2 EN4B
 
@@ -117,7 +117,7 @@ void moveRobot(int Vx,int Vy, int Rot); //speed from -255 to 255 (PWM-valid sign
 void stopAllMotor();
 
 //update the output FOR ONE MOTOR needed to reach the target RPM!
-void updateOnePID(PIDMotor &pid,int targetRPM);
+void updateOnePID(PIDMotor &pid,int targetRPM,Direction dir);
 
 //if the output exceed 255 or lower than -255, we need to scale all the motors by the same ratio!
 void scaleAllPID();
@@ -126,7 +126,8 @@ void scaleAllPID();
 void applyPIDoutputs();
 
 //start the PID process with a target rpm
-void PIDControl(int targetRPM);
+void PIDControl(Direction dir,int targetRPM);
+void resetPIDError();
 
 void rotationPIDController(int rotation);
 

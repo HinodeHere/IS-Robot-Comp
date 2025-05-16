@@ -151,7 +151,7 @@ PIDMotor pidC = {&posC,0.0f,0.0f,0L,0.0f,0.0f,0};
 PIDMotor pidD = {&posD,0.0f,0.0f,0L,0.0f,0.0f,0};
 
 //update the output FOR ONE MOTOR needed to reach the target RPM!
-void updateOnePID(PIDMotor &pid,int targetRPM){
+void updateOnePID(PIDMotor &pid,int targetRPM,Direction dir){
     //Calculate deltaT and save currT to prevT
     long currT = micros();
     if (pid.prevT == 0){
@@ -179,9 +179,22 @@ void updateOnePID(PIDMotor &pid,int targetRPM){
     pid.ePrev = e;
 
     //Tune these constants
-    float Kp = 0.8;
-    float Ki = 0.5;
-    float Kd = 0.005;
+    float Kp;
+    float Ki;
+    float Kd;
+    if (dir == DIR_LEFT){
+        Kp = 0.8;
+        Ki = 0.5;
+        Kd = 0.01;
+    } else if (dir == DIR_RIGHT){
+        Kp = 1.3;
+        Ki = 0.5;
+        Kd = 0.01;
+    }else{
+        Kp = 0.8;
+        Ki = 0.5;
+        Kd = 0.005;
+    }
 
     pid.output = Kp * e + Ki * pid.eIntegral + Kd * dedt;
 
@@ -211,19 +224,65 @@ void scaleAllPID(){
 //Apply all the PID Output to all the motors
 void applyPIDoutputs(){
     float factor = 1.13f;
-    setmotor(pidA.output<=0 , AIN1, AIN2, CH_A, (int)abs(pidA.output)*factor);
+    setmotor(pidA.output<=0 , AIN1, AIN2, CH_A, (int)abs(pidA.output));
     setmotor(pidB.output>=0 , BIN1, BIN2, CH_B, (int)abs(pidB.output)*factor);
-    setmotor(pidC.output>=0 , CIN1, CIN2, CH_C, (int)abs(pidC.output));
+    setmotor(pidC.output>=0 , CIN1, CIN2, CH_C, (int)abs(pidC.output)*factor);
     setmotor(pidD.output<=0 , DIN1, DIN2, CH_D, (int)abs(pidD.output));    
 }
 
+void resetPIDError(){
+    unsigned long now = micros();
+
+    // Clear integrals & last error
+    pidA.eIntegral = pidA.ePrev = 0.0f;
+    pidB.eIntegral = pidB.ePrev = 0.0f;
+    pidC.eIntegral = pidC.ePrev = 0.0f;
+    pidD.eIntegral = pidD.ePrev = 0.0f;
+
+    // Seed timing & position so next updateOnePID has a small delta
+    pidA.prevT   = pidB.prevT   = pidC.prevT   = pidD.prevT   = now;
+    pidA.prevPos = posA;
+    pidB.prevPos = posB;
+    pidC.prevPos = posC;
+    pidD.prevPos = posD;
+}
 
 //start the PID process with a target rpm
-void PIDControl(int targetRPM){
-    updateOnePID(pidA,targetRPM);
-    updateOnePID(pidB,targetRPM);
-    updateOnePID(pidC,targetRPM);
-    updateOnePID(pidD,targetRPM);
+void PIDControl(Direction dir,int targetRPM){
+    int compLeft = targetRPM / 12;
+    int compRight = targetRPM / 11.8;
+    switch(dir){
+        case DIR_FORWARD:
+            updateOnePID(pidC,  targetRPM,dir);
+            updateOnePID(pidB,  targetRPM,dir);
+            updateOnePID(pidD,  targetRPM,dir);
+            updateOnePID(pidA,  targetRPM,dir);
+            break;
+
+        case DIR_BACKWARD:
+            updateOnePID(pidC,  -targetRPM,dir);
+            updateOnePID(pidB,  -targetRPM,dir);
+            updateOnePID(pidD,  -targetRPM,dir);
+            updateOnePID(pidA,  -targetRPM,dir);
+            break;
+
+        case DIR_LEFT:
+            updateOnePID(pidC,  -targetRPM - compLeft,dir);
+            updateOnePID(pidB,  targetRPM,dir);
+            updateOnePID(pidD,  targetRPM ,dir);
+            updateOnePID(pidA,  -targetRPM,dir);
+            break;
+
+        case DIR_RIGHT:
+            updateOnePID(pidC,  targetRPM + compRight,dir);
+            updateOnePID(pidB,  -targetRPM,dir);
+            updateOnePID(pidD,  -targetRPM,dir);
+            updateOnePID(pidA,  targetRPM,dir);
+            break;
+
+    }
+
+
 
     scaleAllPID();
     applyPIDoutputs();
@@ -300,7 +359,7 @@ const int   creep         = 30;    // minimum PWM to overcome static friction
 // Position-PID gains (tune these)
 const float Kp_pos = 0.8f;
 const float Ki_pos = 0.01f;
-const float Kd_pos = 0.08f;
+const float Kd_pos = 0.1f;
 
 // Heading-PID gains (tune these)(rotation) //left and right
 const float Kp_h = 0.75f;
@@ -350,7 +409,7 @@ void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
         int64_t dB = llabs(posB - sB);
         int64_t dC = llabs(posC - sC);
         int64_t dD = llabs(posD - sD);
-        int64_t travelled = min(min(dA,dB), min(dC,dD));
+        int64_t travelled = (dA + dB + dC + dD) / 4;
         if (travelled >= target) break;
 
         //calculate dt
