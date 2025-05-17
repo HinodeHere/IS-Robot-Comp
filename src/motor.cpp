@@ -126,16 +126,15 @@ void setmotor(int dir, int in1, int in2, int pwmChannel, int speed){ //1 for cw 
 }
 
 void moveRobot(int Vx,int Vy, int Rot){ //speed from -255 to 255
-    Vy *= -1;
     int fl = constrain(Vx + Vy + Rot, -255, 255);
     int fr = constrain(Vx - Vy - Rot, -255, 255);
     int bl = constrain(Vx - Vy + Rot, -255, 255);
     int br = constrain(Vx + Vy - Rot, -255, 255);
 
-    setmotor(fl > 0 ? 1 : 0,CIN1,CIN2,CH_C,abs(fl));  //theres a negative because the motor was upside-down
-    setmotor(fr > 0 ? 1 : 0,BIN1,BIN2,CH_B,abs(fr));
-    setmotor(-bl > 0 ? 1 : 0,DIN1,DIN2,CH_D,abs(bl));
-    setmotor(-br > 0 ? 1 : 0,AIN1,AIN2,CH_A,abs(br));
+    setmotor(fl > 0 ? 1 : 0,BIN1,BIN2,CH_B,abs(fl));  //theres a negative because the motor was upside-down
+    setmotor(fr > 0 ? 1 : 0,AIN1,AIN2,CH_A,abs(fr));
+    setmotor(bl > 0 ? 1 : 0,CIN1,CIN2,CH_C,abs(bl));
+    setmotor(br > 0 ? 1 : 0,DIN1,DIN2,CH_D,abs(br));
 }
 
 void stopAllMotor(){
@@ -358,148 +357,74 @@ void rotationPIDController(int rotation){
 
 
 const float wheelRadiusCm = 5.0f;   // wheel radius in cm
-const int   creep         = 30;    // minimum PWM to overcome static friction
+const int   creep         = 40;    // minimum PWM to overcome static friction
 
-// Position-PID gains (tune these)
-const float Kp_pos = 0.8f;
-const float Ki_pos = 0.01f;
-const float Kd_pos = 0.1f;
-
-// Heading-PID gains (tune these)(rotation) //left and right
-const float Kp_h = 0.65f;
-const float Ki_h = 0.01;
-const float Kd_h = 0.01f;
-
-int ALIGN_SPEED = 40; //for correcting yaw of robot when it crosses a while line
-
-void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed){
-    if (dir == DIR_LEFT || dir == DIR_RIGHT){
-        maxSpeed = 50;
-    }
-    double ratioForwards = 140.0f/147.5f;
-    double ratioBackwards = 140.0f/145.0f;
-    double ratioLeft = 140.0f/147.5f;
-    double ratioRight = 140.0f/147.6f;
+void moveByDistanceSimple(Direction dir, float distanceCm) {
+    float forwardFactor = 140.0f/164.5f;
+    float backwardFactor = 140.0f/165.2f;
+    float leftFactor = 140.0f/167.1f;
+    float rightFactor = 140.0f/167.3f;
     switch(dir){
-        case DIR_FORWARD: distanceCm*=ratioForwards; break;
-        case DIR_BACKWARD: distanceCm*=ratioBackwards; break;
-        case DIR_LEFT: distanceCm*=ratioLeft; break;
-        case DIR_RIGHT: distanceCm*=ratioRight; break;
+        case DIR_FORWARD: distanceCm*=forwardFactor; break;
+        case DIR_BACKWARD: distanceCm*=backwardFactor; break;
+        case DIR_LEFT: distanceCm*=leftFactor; break;
+        case DIR_RIGHT: distanceCm*=rightFactor; break;
     }
+    // 1) Compute target encoder pulses from distance
+    const float wheelCircumference = 2 * PI * wheelRadiusCm;
+    float rotationsNeeded = distanceCm / wheelCircumference;
+    int64_t targetPulses = (int64_t)(rotationsNeeded * pulsePerRotation);
+    if (targetPulses <= 0) return;
 
-    float rotation = distanceCm / (2.0f * PI * wheelRadiusCm);
-    int64_t target = (int64_t)(rotation * pulsePerRotation);
-    if(target < 0) return;
+    // 2) Capture starting counts
+    int64_t startA = posA, startB = posB, startC = posC, startD = posD;
 
-    int64_t sA = posA, sB = posB, sC = posC, sD = posD;
+    // 3) Define ramp distances (10% up, 10% down)
+    int64_t rampUpP   = targetPulses * 0.2;
+    int64_t rampDownP = targetPulses * 0.4;
 
-    float prevErrPos = float(target);
-    float intErrPos    = 0.0f;
-    float prevErrHead  = 0.0f;
-    float intErrHead   = 0.0f;
-    uint32_t prevTime  = micros();
-    bool firstLoop     = true;
-
-    int64_t rampUpDist = target * 0.15;
-    int64_t rampDownDist = target * 0.15; //ramp up/down
-
-    if (dir == DIR_LEFT || dir == DIR_RIGHT){
-        rampUpDist = 0;
-    }
-
-    while(true){
-        //measure progress
-        int64_t dA = llabs(posA - sA);
-        int64_t dB = llabs(posB - sB);
-        int64_t dC = llabs(posC - sC);
-        int64_t dD = llabs(posD - sD);
+    // 4) Main loop: drive until average pulses ≥ target
+    while (true) {
+        // a) Measure average pulses traveled
+        int64_t dA = llabs(posA - startA);
+        int64_t dB = llabs(posB - startB);
+        int64_t dC = llabs(posC - startC);
+        int64_t dD = llabs(posD - startD);
         int64_t travelled = (dA + dB + dC + dD) / 4;
-        if (travelled >= target) break;
+        if (travelled >= targetPulses) break;
 
-        //calculate dt
-        uint32_t now = micros();
-        float dt = (now - prevTime) * 1e-6f;
-        prevTime = now;
-        if (firstLoop || dt < 1e-4f) {
-            dt = 0.0f;
-            firstLoop = false;
+        // b) Compute a speed scalar [0..1] based on ramping
+        float phase = 1.0f;  // default full speed
+        if (travelled < rampUpP) {
+            phase = float(travelled) / rampUpP;       // ramp 0→1
+        } else if (travelled > (targetPulses - rampDownP)) {
+            phase = float(targetPulses - travelled) / rampDownP;  // ramp 1→0
+        }
+        // clamp
+        phase = constrain(phase, 0.1f, 1.0f);
+
+        // c) Command base speed = 100 * phase
+        int baseSpeed = (int)(100 * phase);
+        if (baseSpeed > 0 && baseSpeed < creep) {
+            baseSpeed = creep;
         }
 
-        //position PID
-        float errPos = float(target - travelled);
-        intErrPos   += errPos * dt;
-        float dErrPos = dt>0 ? (errPos - prevErrPos)/dt : 0.0f;
-        prevErrPos = errPos;
-        float uPos   = Kp_pos * errPos + Ki_pos * intErrPos + Kd_pos * dErrPos;
-        int s        = constrain((int)uPos, creep, maxSpeed);
-
-
-        //RampUp / RampDown
-        float rampUp   = constrain((float)travelled    / rampUpDist, 0, 1);
-        float rampDown = constrain((float)(target - travelled) / rampDownDist, 0, 1);
-        float rampMul  = min(rampUp, rampDown);
-        rampMul = max(rampMul, 0.20f); //ensure atleast got power to move
-
-        s *= rampMul;
-        if (s > 0 && s < creep){
-            s = creep;
-        }
-        
-        //heading PID (yaw)
-        float leftAvg;
-        float rightAvg;
-        if (dir == DIR_BACKWARD || dir ==DIR_FORWARD){
-            leftAvg  = ( llabs(posC - sC) + llabs(posD - sD) ) * 0.5f;
-            rightAvg = ( llabs(posA - sA) + llabs(posB - sB) ) * 0.5f;
-        } else if (dir == DIR_LEFT){
-            leftAvg  = ( llabs(posA - sA) + llabs(posD - sD) ) * 0.5f;
-            rightAvg = ( llabs(posC - sC) + llabs(posB - sB) ) * 0.5f; 
-        } else{
-            rightAvg  = ( llabs(posA - sA) + llabs(posD - sD) ) * 0.5f;
-            leftAvg = ( llabs(posC - sC) + llabs(posB - sB) ) * 0.5f; 
-
-        }
-        float errHead   = rightAvg - leftAvg;
-        intErrHead     += errHead * dt;
-        float dErrHead  = dt>0 ? (errHead - prevErrHead)/dt : 0.0f;
-        prevErrHead    = errHead;
-        float uHead     = Kp_h * errHead + Ki_h * intErrHead + Kd_h * dErrHead;
-        int rotVel     = constrain((int)uHead, -maxSpeed, maxSpeed);
-        Serial.print("errYaw="); Serial.println(intErrHead);
-
-
-        //change vx,vy and rotvel by PID!
-        int vx=0, vy=0;
+        // d) Turn that into vx/vy for your direction
+        int yawComp = 1;
+        int vx = 0, vy = 0, rot = 0;
         switch (dir) {
-            case DIR_FORWARD:  vx =  s; vy = 0; break;
-            case DIR_BACKWARD: vx = -s; vy = 0; rotVel = -rotVel; break;
-            case DIR_LEFT:     vx =  0; vy = -s; break;
-            case DIR_RIGHT:    vx =  0; vy =  s; break;
+            case DIR_FORWARD:  vx =  baseSpeed; vy = 0; rot = -yawComp; break;
+            case DIR_BACKWARD: vx = -baseSpeed; vy = 0; rot = -yawComp; break;
+            case DIR_LEFT:     vx = 0; vy = -baseSpeed; rot = yawComp; break;
+            case DIR_RIGHT:    vx = 0; vy =  baseSpeed; rot = yawComp; break;
         }
 
-        // //line sensor overwrite yaw PID on white line
-        // bool leftLine = (digitalRead(IR_LEFT) == LOW);
-        // bool rightLine = (digitalRead(IR_RIGHT) == LOW);
-        // if ((leftLine || rightLine) && (dir == DIR_BACKWARD || dir == DIR_FORWARD)){
-        //     //halt x and y direction movement
-        //     vx*=0.3;
-        //     vy*=0.3;
-        //     if (leftLine && !rightLine) rotVel = -ALIGN_SPEED; //turn right
-        //     else if (rightLine && !leftLine) rotVel = ALIGN_SPEED;
-        //     else rotVel = 0;
-
-        //     prevErrHead = 0;
-        //     intErrHead = 0;
-        //     if (dir == DIR_BACKWARD) rotVel = -rotVel;
-        // }
-
-        moveRobot(vx, vy, rotVel);
-        // Serial.print("vx="); Serial.println(vx);
-        // Serial.print(" vy="); Serial.println(vy);
-        // Serial.print(" rot="); Serial.println(rotVel);
+        // e) Drive straight
+        moveRobot(vx, vy, rot);
 
         delay(2);
     }
-    stopAllMotor();
 
+    // 5) Stop at the end
+    stopAllMotor();
 }

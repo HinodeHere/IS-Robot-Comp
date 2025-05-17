@@ -4,8 +4,8 @@
 
 // === Motor A ===
 #define PWMA 42
-#define AIN1 41
-#define AIN2 40
+#define AIN1 40
+#define AIN2 41
 // Encoder pins:
 #define EN1A 48
 #define EN1B 21
@@ -35,8 +35,8 @@
 
 // === Motor D ===
 #define PWMD 7
-#define DIN1 5
-#define DIN2 6
+#define DIN1 6
+#define DIN2 5
 // Encoder pins:
 #define EN4A 46
 #define EN4B 10
@@ -131,7 +131,6 @@ void resetPIDError();
 
 void rotationPIDController(int rotation);
 
-void moveByDistanceDecel(Direction dir, float distanceCm, int maxSpeed);
-
+void moveByDistanceSimple(Direction dir, float distanceCm);
 
 #endif

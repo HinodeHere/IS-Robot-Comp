@@ -7,7 +7,7 @@
 #define SDA 8
 #define freq 100000
 
-#define maxSpeed 128 //in pwm
+#define maxSpeed 80 //in pwm
 
 volatile uint8_t pendingType = 0;
 volatile uint8_t distance = 0;
@@ -50,196 +50,170 @@ void requestedEvent(){
 
 // For when the ESP is a SLAVE!!
 
-void setup(){
-    Serial.begin(115200);
-    motorInit();
-    Wire.begin(SLAVE_ADDR,SDA,SCL,freq);
-    Wire.onReceive(receivedEvent);
+// void setup(){
+//     Serial.begin(115200);
+//     motorInit();
+//     Wire.begin(SLAVE_ADDR,SDA,SCL,freq);
+//     Wire.onReceive(receivedEvent);
 
-    // only used when i need to send data back to Master
-    Wire.onRequest(requestedEvent);
-}
+//     // only used when i need to send data back to Master
+//     Wire.onRequest(requestedEvent);
+// }
 
-void loop(){
-    if (needReset == true){
-      needReset = false;
-      resetPIDError();
-    }
-    if (newCommand == true || pendingType == 5 || pendingType == 6){
-        newCommand = false;
-        int s;
-        float timeGrid = (float)distance/51.0f * 1000;
-        switch (pendingType) {
-            case 0:
-              stopAllMotor();
-              motorsRunning = false;
-              break;
+// void loop(){
+//     if (needReset == true){
+//       needReset = false;
+//       resetPIDError();
+//     }
+//     if (newCommand == true || pendingType == 5 || pendingType == 6){
+//         newCommand = false;
+//         int s;
+//         float timeGrid = (float)distance/51.0f * 1000;
+//         switch (pendingType) {
+//             case 0:
+//               stopAllMotor();
+//               motorsRunning = false;
+//               break;
       
-            case 1:
-              motorsRunning = true;
-              moveRobot(90,0,11);
-              delay(timeGrid);
-              stopAllMotor();
-              break;
+//             case 1:
+//               motorsRunning = true;
+//               moveRobot(90,0,11);
+//               delay(timeGrid);
+//               stopAllMotor();
+//               break;
       
-            case 2:
-              motorsRunning = true;
-              moveRobot(-90,0,-11);
-              delay(timeGrid);
-              stopAllMotor();
-              break;
+//             case 2:
+//               motorsRunning = true;
+//               moveRobot(-90,0,-11);
+//               delay(timeGrid);
+//               stopAllMotor();
+//               break;
   
-            case 3:
-              motorsRunning = true;
-              moveByDistanceDecel(DIR_LEFT,     distance, maxSpeed);
-              break;
+//             case 3:
+//               motorsRunning = true;
+//               moveByDistanceDecel(DIR_LEFT,     distance, maxSpeed);
+//               break;
       
-            case 4:
-              motorsRunning = true;
-              moveByDistanceDecel(DIR_RIGHT,    distance, maxSpeed);
-              break;
-            case 5: //- for going left PID RPM
-              s = distance;
-              motorsRunning = true;
-              PIDControl(DIR_LEFT,s);
-              delay(50);
-              break;
-            case 6:
-              s = distance;
-              motorsRunning = true;
-              PIDControl(DIR_RIGHT,s);
-              delay(50);
-              break;
-        }
+//             case 4:
+//               motorsRunning = true;
+//               moveByDistanceDecel(DIR_RIGHT,    distance, maxSpeed);
+//               break;
+//             case 5: //- for going left PID RPM
+//               s = distance;
+//               motorsRunning = true;
+//               PIDControl(DIR_LEFT,s);
+//               delay(50);
+//               break;
+//             case 6:
+//               s = distance;
+//               motorsRunning = true;
+//               PIDControl(DIR_RIGHT,s);
+//               delay(50);
+//               break;
+//         }
 
-        motorsRunning = false;
-    }
-}
+//         motorsRunning = false;
+//     }
+// }
 
 
 
 //ONLY FOR WHEN THE ESP32 IS NOT A SLAVE!
-// float timeOneGrid = 70.0f/52.0f * 1000;
+float timeOneGrid = 70.0f/52.0f * 1000;
 
-// void setup(){
-//     motorInit();
+void setup(){
+    motorInit();
 
-//   Serial.begin(115200);
-// }
+  Serial.begin(115200);
+}
 
-// void loop(){
-//   // for (int i =0 ; i < 3000; i++){
-//   //   PIDControl(DIR_LEFT,50);
-//   //   delay(10);
-//   // }
-//   // moveByDistanceDecel(DIR_FORWARD,140,maxSpeed);
-//   // delay(500);
+void loop(){
+  moveByDistanceSimple(DIR_FORWARD,140);
+  delay(500);
 
-//   //going forward
-//   // moveRobot(90,0,11);
-//   // delay(timeOneGrid);
-//   // stopAllMotor();
+  moveByDistanceSimple(DIR_LEFT,60);
+  delay(500);
 
-//   //going backwards
-//   moveRobot(-90,0,-11);
-//   delay(timeOneGrid);
-//   stopAllMotor();
+  moveByDistanceSimple(DIR_BACKWARD,280);
+  delay(500);
 
-//   //1 sec = 52cm
-//   // x = 70cm => x = 70/52
+  moveByDistanceSimple(DIR_LEFT,70);
+  delay(500);
 
-//   // moveByDistanceDecel(DIR_LEFT,60,maxSpeed);
-//   // delay(500);
-//   // moveByDistanceDecel(DIR_BACKWARD,140,maxSpeed);
-//   // delay(500);
-//   // moveByDistanceDecel(DIR_LEFT,70,maxSpeed);
-//   // delay(500);
+  moveByDistanceSimple(DIR_FORWARD,280);
+  delay(500);
+
+  moveByDistanceSimple(DIR_LEFT,70);
+  delay(500);
+
+  moveByDistanceSimple(DIR_BACKWARD,280);
+  delay(500);
+
+  moveByDistanceSimple(DIR_LEFT,60);
+  delay(500);
 
 
-//   // moveByDistanceDecel(DIR_FORWARD,280,maxSpeed);
-//   // delay(500);
-//   // moveByDistanceDecel(DIR_LEFT,60,maxSpeed);
-//   // delay(500);
-//   // moveByDistanceDecel(DIR_BACKWARD,280,maxSpeed);
-//   // delay(500);
-  
-//   // moveByDistanceDecel(DIR_RIGHT,210,maxSpeed);
-//   // delay(500);
-//   // moveByDistanceDecel(DIR_FORWARD,140,maxSpeed);
-//   // delay(500);
+  stopAllMotor();
+  while(1){
+    delay(1000);
+  }
+    // moveRobot(100,0,0);
 
+    // Serial.print("Printing Pos A: ");
+    // Serial.print(posA);
+    // delay(10);
 
-//   // moveByDistanceDecel(DIR_FORWARD,70,maxSpeed);
-//   // delay(500);
-//   // moveByDistanceDecel(DIR_BACKWARD,70,maxSpeed);
-//   // delay(500);
-  
-//   // for (int i = 0; i < 15; i++){
-//   //   PIDControl(60);
-//   //   delay(250);
-//   // }
+    // Serial.print(" Printing Pos B: ");
+    // Serial.print(posB);
+    // delay(10);
 
-//   // stopAllMotor();
-//   // while(1){
-//   //   delay(1000);
-//   // }
-//     // moveRobot(100,0,0);
+    // Serial.print(" Printing Pos C: ");
+    // Serial.print(posC);
+    // delay(10);
 
-//     // Serial.print("Printing Pos A: ");
-//     // Serial.print(posA);
-//     // delay(10);
+    // Serial.print(" Printing Pos D: ");
+    // Serial.println(posD);
+    // delay(10);
 
-//     // Serial.print(" Printing Pos B: ");
-//     // Serial.print(posB);
-//     // delay(10);
+    // // for when if reach white line it will reverse back for 500ms
+    // moveRobot(100,0,0);
+    // while(readIRsensor() != 0){
+    //     Serial.println(readIRsensor());
+    // }
 
-//     // Serial.print(" Printing Pos C: ");
-//     // Serial.print(posC);
-//     // delay(10);
-
-//     // Serial.print(" Printing Pos D: ");
-//     // Serial.println(posD);
-//     // delay(10);
-
-//     // // for when if reach white line it will reverse back for 500ms
-//     // moveRobot(100,0,0);
-//     // while(readIRsensor() != 0){
-//     //     Serial.println(readIRsensor());
-//     // }
-
-//     // moveRobot(-50,0,0);
-//     // delay(1000);
-//     // stopAllMotor();
-//     // while(1){}
+    // moveRobot(-50,0,0);
+    // delay(1000);
+    // stopAllMotor();
+    // while(1){}
     
 
-//     // // move robot in a square
-//     // for (int i = 0; i < 4; i++){
-//     //     moveRobot(100,0,0);
-//     //     delay(500);
-//     //     stopAllMotor();
-//     //     delay(500);
+    // // move robot in a square
+    // for (int i = 0; i < 4; i++){
+    //     moveRobot(100,0,0);
+    //     delay(500);
+    //     stopAllMotor();
+    //     delay(500);
     
-//     //     moveRobot(0,100,0);
-//     //     delay(500);
-//     //     stopAllMotor();
-//     //     delay(500);
+    //     moveRobot(0,100,0);
+    //     delay(500);
+    //     stopAllMotor();
+    //     delay(500);
 
-//     //     moveRobot(0,0,70);
-//     //     delay(1000);
-//     //     stopAllMotor();
-//     //     delay(500);
-//     // }
-//     // moveRobot(0,50,0);
-
-
-//     // int rotation = 6;
-//     // PIDController(rotation);
-//     // Serial.println(pos);
-//     // delay(15);
+    //     moveRobot(0,0,70);
+    //     delay(1000);
+    //     stopAllMotor();
+    //     delay(500);
+    // }
+    // moveRobot(0,50,0);
 
 
+    // int rotation = 6;
+    // PIDController(rotation);
+    // Serial.println(pos);
+    // delay(15);
 
-//     stopAllMotor();
-//     while(1){}
-// }
+
+
+    stopAllMotor();
+    while(1){}
+}
