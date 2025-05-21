@@ -128,35 +128,37 @@ void setup(){
 }
 
 void loop(){
-  moveByDistanceSimple(DIR_FORWARD,140);
-  delay(500);
+  moveRobot(100,0,0);
+  delay(2000);
+  // moveByDistanceSimple(DIR_FORWARD,140);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_LEFT,60);
-  delay(500);
+  // moveByDistanceSimple(DIR_LEFT,60);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_BACKWARD,280);
-  delay(500);
+  // moveByDistanceSimple(DIR_BACKWARD,280);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_LEFT,70);
-  delay(500);
+  // moveByDistanceSimple(DIR_LEFT,70);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_FORWARD,280);
-  delay(500);
+  // moveByDistanceSimple(DIR_FORWARD,280);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_LEFT,70);
-  delay(500);
+  // moveByDistanceSimple(DIR_LEFT,70);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_BACKWARD,280);
-  delay(500);
+  // moveByDistanceSimple(DIR_BACKWARD,280);
+  // delay(500);
 
-  moveByDistanceSimple(DIR_LEFT,60);
-  delay(500);
+  // moveByDistanceSimple(DIR_LEFT,60);
+  // delay(500);
 
 
-  stopAllMotor();
-  while(1){
-    delay(1000);
-  }
+  // stopAllMotor();
+  // while(1){
+  //   delay(1000);
+  // }
     // moveRobot(100,0,0);
 
     // Serial.print("Printing Pos A: ");
